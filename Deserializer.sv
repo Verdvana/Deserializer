@@ -1,135 +1,133 @@
 //=============================================================================
-//
-// Module Name:					Deserializer
-// Department:					Qualcomm (Shanghai) Co., Ltd.
-// Function Description:	    Deserializer
-//
-//------------------------------------------------------------------------------
-//
-// Version 	Design		Coding		Simulata	  Review		Rel data
-// V1.0		Verdvana	Verdvana	Verdvana		  			2021-08-15
-//
-//------------------------------------------------------------------------------
-//
+// Module Name:				Deserializer
+// Function Description:	Multi-bit Deserializer
+// Department:				Qualcomm (Shanghai) Co., Ltd.
+// Author:					Verdvana
+// Email:					verdvana@outlook.com
+//-----------------------------------------------------------------------------
+// Version	Design		Coding		Simulate    Review      Rel date
+// V1.0		Verdvana	Verdvana	Verdvana				2020-02-26
+// V1.1		Verdvana	Verdvana	Verdvana				2021-08-15
+// V1.2		Verdvana	Verdvana	Verdvana				2021-11-25
+//-----------------------------------------------------------------------------
 // Version	Modified History
-// V1.0		
-//
+// V1.0		Single bit deserialize;
+//          The parallel width is configurable;
+//          MSB/LSB.
+// V1.1     Add stream mode.
+// V1.2     Multi-bit deserialize.
 //=============================================================================
 
-//The time unit and precision of the external declaration
-timeunit        1ns;
-timeprecision   1ps;
+
+// Include
 
 // Define
 //`define			FPGA_EMU
 
+
+`timescale 1ns/1ps
+
 //Module
-module  Deserializer #(
-    parameter       DATA_WIDTH  = 5                     //Data width
+module Deserializer #(
+    parameter   DATA_WIDTH  = 8,
+                PARL_WIDTH  = 8
 )(
-	// Clock and reset
-	input  logic							clk,		//Clock
-	input  logic							rst_n,		//Async reset
-    // Status
-    input  logic                            dir,        //MSB or LSB
-    input  logic                            valid,      //Input valid
-    output logic                            ready,      //Output ready
-    output logic                            ready_str,  //Stream output ready
-	// Inout
-	input  logic							ser,        //Serial input
-    output logic [DATA_WIDTH-1:0]           par,        //Parallel output
-    output logic [DATA_WIDTH-1:0]           par_str     //Parallel stream output
+    input   wire                        clk,
+    input   wire                        rst_n,
+
+    input   wire                        en,
+    input   wire                        dir,
+    output  logic                       valid,
+    output  logic                       valid_str,
+
+    input   wire    [DATA_WIDTH-1:0]    ser,
+    output  logic   [DATA_WIDTH-1:0]    par     [PARL_WIDTH]
 );
 
-    //=========================================================
-    // Bit width calculation function
-    function integer clogb2 (input integer depth);
-    begin
-        for (clogb2=0; depth>0; clogb2=clogb2+1) 
-            depth = depth >>1;                          
-    end
-    endfunction
-
+	//=========================================================
+	// The time unit and precision of the external declaration
+	timeunit        	1ns;
+	timeprecision   	1ps;
 
     //=========================================================
-    // Parameter
-    localparam                  TCO  = 0.7;                  //Register delay
+    // Local parameter
+    localparam      TCO = 1;
+
+	//=========================================================
+	// Signal
+    logic [$clog2(PARL_WIDTH-1)-1:0]    cnt;
+    logic [PARL_WIDTH-1:0]              en_ff;
 
 
-    //=========================================================
-    // Signal
-	logic   [clogb2(DATA_WIDTH-1)-1:0]  cnt;
-
-
-    //=========================================================
-    // Status counter
+	//=========================================================
+	// Status counter
     always_ff@(posedge clk, negedge rst_n)begin
         if(!rst_n)
-            cnt     <= #TCO '0;
-        else if(valid)
-                if(cnt>= DATA_WIDTH-1)
-                    cnt     <= #TCO '0;
-                else
-                    cnt     <= #TCO cnt + 1'b1;
-        else
-            cnt     <= #TCO cnt;
-    end
-
-
-    //=========================================================
-    // Parallel output
-    always_ff@(posedge clk, negedge rst_n)begin
-        if(!rst_n)
-            par_str <= #TCO '0;
-        else if(valid)
-            if(dir)
-                par_str <= #TCO {par_str[DATA_WIDTH-2:0],ser};
+            cnt     <= #TCO 0;
+        else if(en)
+            if(cnt >= (PARL_WIDTH-1))
+                cnt     <= #TCO 0;
             else
-                par_str <= #TCO {ser,par_str[DATA_WIDTH-1:1]};
+                cnt     <= #TCO cnt + 1'b1;
         else
-            par_str <= #TCO par_str;
+            cnt     <= #TCO 0;
+    end
+
+	//=========================================================
+	// Parallel output
+    always_ff@(posedge clk, negedge rst_n)begin
+        if(!rst_n)
+            for(int i=0;i<PARL_WIDTH;i++)begin
+                par[i]  <= #TCO '0;
+            end
+        else if(en)
+            if(dir)begin
+                for(int i=0;i<(PARL_WIDTH-1);i++)begin
+                    par[i+1]  <= #TCO par[i];
+                end
+                par [0]  <= #TCO ser;
+            end
+            else begin
+                for(int i=0;i<(PARL_WIDTH-1);i++)begin
+                    par[i]    <= #TCO par[i+1];
+                end
+                par [PARL_WIDTH-1]     <= #TCO ser;
+            end
+        else
+            if(dir)begin
+                for(int i=0;i<(PARL_WIDTH-1);i++)begin
+                    par[i+1]  <= #TCO par[i];
+                end
+                par [0]  <= #TCO '0;
+            end
+            else begin
+                for(int i=0;i<(PARL_WIDTH-1);i++)begin
+                    par[i]    <= #TCO par[i+1];
+                end
+                par [PARL_WIDTH-1]  <= #TCO '0;
+            end
+    end
+
+
+	//=========================================================
+	// Status output
+    always_ff@(posedge clk, negedge rst_n)begin
+        if(!rst_n)
+            valid   <= #TCO '0;
+        else
+            if(cnt == (PARL_WIDTH-1))
+                valid   <= #TCO en;
+            else
+                valid   <= #TCO '0;
     end
 
     always_ff@(posedge clk, negedge rst_n)begin
         if(!rst_n)
-            par     <= #TCO '0;
-        else if(valid)
-            if(cnt == DATA_WIDTH-1)
-                if(dir)
-                    par     <= #TCO {par_str[DATA_WIDTH-2:0],ser};
-                else
-                    par     <= #TCO {ser,par_str[DATA_WIDTH-1:1]};
-            else
-                par     <= #TCO par;
+            en_ff   <= #TCO '0;
         else
-            par     <= #TCO par;
+            en_ff   <= #TCO {en_ff[PARL_WIDTH-2:0],en};
     end
 
-
-    //=========================================================
-    // Status output
-    always_ff@(posedge clk, negedge rst_n)begin
-        if(!rst_n)
-            ready_str   <= #TCO '0;
-        else if(valid)
-            if(cnt == DATA_WIDTH-1)
-                ready_str   <= #TCO '1;
-            else
-                ready_str   <= #TCO ready_str;
-        else
-            ready_str   <= #TCO '0;
-    end
-
-    always_ff@(posedge clk, negedge rst_n)begin
-        if(!rst_n)
-            ready   <= #TCO '0;
-        else if(valid)
-            if(cnt == DATA_WIDTH-1)
-                ready   <= #TCO '1;
-            else
-                ready   <= #TCO '0;
-        else
-            ready   <= #TCO '0;
-    end
+    assign valid_str    = en_ff[PARL_WIDTH-1];
 
 endmodule
