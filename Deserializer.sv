@@ -24,28 +24,25 @@
 // Define
 //`define			FPGA_EMU
 
-
-`timescale 1ns/1ps
-
 //Module
 module Deserializer #(
-    parameter   DATA_WIDTH  = 8,
-                PARL_WIDTH  = 8
+    parameter   DATA_WIDTH  = 8,                                // Data width
+                PARL_WIDTH  = 8                                 // Parallel width
 )(
-    input   wire                        clk,
-    input   wire                        rst_n,
+    input   wire                        clk,                    // Clock
+    input   wire                        rst_n,                  // Async reset
 
-    input   wire                        en,
-    input   wire                        dir,
-    output  logic                       valid,
-    output  logic                       valid_str,
+    input   wire                        en,                     // Enable
+    input   wire                        dir,                    // Parallel direction
+    output  logic                       valid,                  // Parallel data valid
+    output  logic                       valid_str,              // Parallel data stream valid
 
-    input   wire    [DATA_WIDTH-1:0]    ser,
-    output  logic   [DATA_WIDTH-1:0]    par     [PARL_WIDTH]
+    input   wire    [DATA_WIDTH-1:0]    ser,                    // Serial data input
+    output  logic   [DATA_WIDTH-1:0]    par     [PARL_WIDTH]    // Parallel data output
 );
 
 	//=========================================================
-	// The time unit and precision of the external declaration
+	// The time unit and precision of the internal declaration
 	timeunit        	1ns;
 	timeprecision   	1ps;
 
@@ -55,8 +52,8 @@ module Deserializer #(
 
 	//=========================================================
 	// Signal
-    logic [$clog2(PARL_WIDTH-1)-1:0]    cnt;
-    logic [PARL_WIDTH-1:0]              en_ff;
+    logic [$clog2(PARL_WIDTH-1)-1:0]    cnt;                    // Counter
+    logic [PARL_WIDTH-1:0]              en_ff;                  // Enable FF
 
 
 	//=========================================================
