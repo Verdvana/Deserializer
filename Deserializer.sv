@@ -62,7 +62,7 @@ module Deserializer #(
         if(!rst_n)
             cnt     <= #TCO 0;
         else if(en)
-            if(cnt >= (PARL_WIDTH-1))
+            if(cnt == (PARL_WIDTH-1))
                 cnt     <= #TCO 0;
             else
                 cnt     <= #TCO cnt + 1'b1;
@@ -125,6 +125,6 @@ module Deserializer #(
             en_ff   <= #TCO {en_ff[PARL_WIDTH-2:0],en};
     end
 
-    assign valid_str    = en_ff[PARL_WIDTH-1];
+    assign valid_str    = en_ff[PARL_WIDTH-1]&en_ff[0];
 
 endmodule
